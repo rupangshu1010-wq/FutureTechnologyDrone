@@ -1,0 +1,39 @@
+name: ESP-IDF Build
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Fix Git Dubious Ownership
+        run: git config --global --add safe.directory "*"
+
+      - name: Build with ESP-IDF v4.4
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: 'v4.4'
+          target: 'esp32s3'
+          path: '.'
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lite-wing-firmware-v4.4
+          path: |
+            build/*.bin
+            build/flasher_args.json
+            build/bootloader/bootloader.bin
+            build/partition_table/partition-table.bin
+          if-no-files-found: error
