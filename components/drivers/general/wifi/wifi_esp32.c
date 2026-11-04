@@ -1,3 +1,9 @@
+/*
+ * SPDX-FileCopyrightText: 2022-2023 Espressif Systems (Shanghai) CO LTD
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #include <string.h>
 
 #include "config.h"
@@ -22,12 +28,9 @@
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 4, 0)
 #include "esp_mac.h"
 #endif
-#include "espnow.h"
-#include "espnow_ctrl.h"
-#include "espnow_utils.h"
 
-#define UDP_SERVER_PORT         2390
-#define UDP_SERVER_BUFSIZE      64
+#define UDP_SERVER_PORT        2390
+#define UDP_SERVER_BUFSIZE     64
 
 static struct sockaddr_storage source_addr;
 
@@ -65,7 +68,7 @@ static uint8_t calculate_cksum(void *data, size_t len)
 }
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
-                               int32_t event_id, void *event_data)
+                            int32_t event_id, void *event_data)
 {
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
@@ -97,7 +100,7 @@ bool wifiSendData(uint32_t size, uint8_t *data)
     UDPPacket outStage = {0};
     outStage.size = size;
     memcpy(outStage.data, data, size);
-    // Dont' block when sending
+    // Don't block when sending
     return (xQueueSend(udpDataTx, &outStage, M2T(100)) == pdTRUE);
 };
 
@@ -176,7 +179,7 @@ static void udp_server_rx_task(void *pvParameters)
 static void udp_server_tx_task(void *pvParameters)
 {
     UDPPacket outPacket = {0};
-    while (TRUE) {
+    while (true) {
         if(isUDPInit == false) {
             vTaskDelay(20);
             continue;
@@ -202,53 +205,6 @@ static void udp_server_tx_task(void *pvParameters)
     }
 }
 
-static void espnow_ctrl_data_cb(espnow_attribute_t initiator_attribute,
-                                       espnow_attribute_t responder_attribute,
-                                       uint32_t status1,
-                                       int status2,
-                                       int lx_value,
-                                       int ly_value,
-                                       int rx_value,
-                                       int ry_value,
-                                       int channel_one_value,
-                                       int channel_two_value)
-{
-    UDPPacket inPacket;
-    inPacket.size = 7;
-    inPacket.data[0] = 'n';
-    inPacket.data[1] = 'o';
-    inPacket.data[2] = 'w';
-    inPacket.data[3] = lx_value & 0xFF;
-    inPacket.data[4] = ly_value & 0xFF;
-    inPacket.data[5] = ry_value & 0xFF;
-    inPacket.data[6] = rx_value & 0xFF;
-    xQueueSend(udpDataRx, &inPacket, 0);
-}
-
-static void app_espnow_event_handler(void *handler_args, esp_event_base_t base, int32_t id, void *event_data)
-{
-    if (base != ESP_EVENT_ESPNOW) {
-        return;
-    }
-
-    switch (id) {
-    case ESP_EVENT_ESPNOW_CTRL_BIND: {
-        espnow_ctrl_bind_info_t *info = (espnow_ctrl_bind_info_t *)event_data;
-        DEBUG_PRINT_LOCAL("bind, uuid: " MACSTR ", initiator_type: %d", MAC2STR(info->mac), info->initiator_attribute);
-        break;
-    }
-
-    case ESP_EVENT_ESPNOW_CTRL_UNBIND: {
-        espnow_ctrl_bind_info_t *info = (espnow_ctrl_bind_info_t *)event_data;
-        DEBUG_PRINT_LOCAL("unbind, uuid: " MACSTR ", initiator_type: %d", MAC2STR(info->mac), info->initiator_attribute);
-        break;
-    }
-
-    default:
-        break;
-    }
-}
-
 void wifiInit(void)
 {
     if (isInit) {
@@ -260,7 +216,6 @@ void wifiInit(void)
     udpDataTx = xQueueCreate(16, sizeof(UDPPacket));
     DEBUG_QUEUE_MONITOR_REGISTER(udpDataTx);
 
-    espnow_storage_init();
     esp_netif_t *ap_netif = NULL;
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -299,11 +254,7 @@ void wifiInit(void)
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
     esp_wifi_set_channel(WIFI_CH, WIFI_SECOND_CHAN_NONE);
-    espnow_config_t espnow_config = ESPNOW_INIT_CONFIG_DEFAULT();
-    espnow_init(&espnow_config);
-    esp_event_handler_register(ESP_EVENT_ESPNOW, ESP_EVENT_ANY_ID, app_espnow_event_handler, NULL);
-    ESP_ERROR_CHECK(espnow_ctrl_responder_bind(30 * 1000, -55, NULL));
-    espnow_ctrl_responder_data(espnow_ctrl_data_cb);
+
     esp_netif_ip_info_t ip_info = {
         .ip.addr = ipaddr_addr("192.168.43.42"),
         .netmask.addr = ipaddr_addr("255.255.255.0"),
